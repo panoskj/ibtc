@@ -55,6 +55,48 @@ export class InterBtcService {
         throw new Error('You have to login for this function.');
     }
 
+    async inspectTx(blockHash: string, transactionHash: string) {
+        const block = await this.interBTC.api.rpc.chain.getBlock(blockHash);
+
+        // Find the transaction in the block's extrinsics
+        const extrinsics = block.block.extrinsics;
+        const extrinsic = extrinsics.find(ext => ext.hash.toHex() == transactionHash);
+
+        if (!extrinsic) throw new Error('TX not found');
+
+        console.log('Pending extrinsic:', extrinsic.toHuman());
+        const {
+            method: { method },
+            tip,
+        } = extrinsic;
+        console.log(`Method ${method}, tip ${tip}`);
+
+        return { method, tip };
+    }
+
+    async getMempoolTransaction(interBTC: InterBtcApi) {
+        while (true) {
+            try {
+                const pendingExtrinsics = await interBTC.api.rpc.author.pendingExtrinsics();
+
+                pendingExtrinsics.forEach(extrinsic => {
+                    console.log('Pending extrinsic:', extrinsic.toHuman());
+                    const {
+                        method: { method },
+                        tip,
+                    } = extrinsic;
+                    console.log(`Method ${method}, tip ${tip}`);
+                });
+
+                if (pendingExtrinsics.length > 0) return pendingExtrinsics;
+            } catch (error) {
+                console.error(error);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+
     async runRemainingQty(frequencyMilliseconds: number) {
         const intrCurrency: CurrencyExt = this.interBTC.getGovernanceCurrency();
         const accountId = newAccountId(this.interBTC.api, this.requireAddress());
