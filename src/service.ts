@@ -47,7 +47,7 @@ export class InterBtcService {
             .filter(extrinsic => extrinsic.signer.toString() != excludingAddress)
             .map(extrinsic => Number(extrinsic.tip));
 
-        return Math.max(...tips);
+        return Math.max(0, ...tips);
     }
 
     requireAddress() {
