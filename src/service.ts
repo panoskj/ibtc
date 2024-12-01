@@ -1,4 +1,5 @@
-import { createInterBtcApi, InterBtcApi } from '@interlay/interbtc-api';
+import { createInterBtcApi, CurrencyExt, InterBtcApi, newAccountId, VaultExt } from '@interlay/interbtc-api';
+import { BitcoinAmount } from '@interlay/monetary-js';
 import { Keyring } from '@polkadot/keyring';
 
 export async function createInterBtcService() {
@@ -13,9 +14,13 @@ export async function createInterBtcService() {
 
 export class InterBtcService {
     interBTC: InterBtcApi;
+    remainingQty?: number;
+    intrPerBtc: number;
+    address?: string;
 
     constructor(interBTC: InterBtcApi) {
         this.interBTC = interBTC;
+        this.intrPerBtc = 33400;
     }
 
     async login(mnemonic: string) {
@@ -28,7 +33,7 @@ export class InterBtcService {
 
         console.log(`Account = ${account.address}`);
 
-        return account.address;
+        this.address = account.address;
     }
 
     async disconnect() {
@@ -43,5 +48,82 @@ export class InterBtcService {
             .map(extrinsic => Number(extrinsic.tip));
 
         return Math.max(...tips);
+    }
+
+    requireAddress() {
+        if (this.address) return this.address;
+        throw new Error('You have to login for this function.');
+    }
+
+    async runRemainingQty(frequencyMilliseconds: number) {
+        const intrCurrency: CurrencyExt = this.interBTC.getGovernanceCurrency();
+        const accountId = newAccountId(this.interBTC.api, this.requireAddress());
+
+        while (true) {
+            try {
+                const { free: balance } = await this.interBTC.tokens.balance(intrCurrency, accountId);
+                this.remainingQty = Math.trunc((10000 * Number(balance)) / this.intrPerBtc) / 10000;
+            } catch (ex) {
+                console.error('runRemainingQty failed');
+                console.error(ex);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, frequencyMilliseconds));
+        }
+    }
+
+    async runVault(vault: VaultExt, maxQty: number) {
+        while (true) {
+            let canIssue = false;
+            try {
+                if (!this.interBTC.account) return;
+                if (vault.backingCollateral.isZero()) return;
+                const issuable = await vault.getIssuableTokens();
+                canIssue = true;
+                const amount = Number(issuable.mul(10e8).toHuman()) / 10e8;
+                if (amount <= 0.0005) continue;
+                console.log(`The time is ${new Date()}`);
+                console.log(`IssuableQty = ${amount}    -    RemainingQty = ${this.remainingQty})`);
+
+                const max = new BitcoinAmount(Math.min(maxQty, this.remainingQty ?? maxQty));
+                const issue = issuable.min(max);
+                const result = await this.interBTC.issue.request(issue);
+                await result.extrinsic.signAndSend(this.requireAddress(), { tip: 1000000 });
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            } catch (ex) {
+                if (canIssue) {
+                    console.error('runVault failed');
+                    console.error(ex);
+                }
+                if (!canIssue) await new Promise(resolve => setTimeout(resolve, 30000));
+            }
+        }
+    }
+
+    async runAllVaults(maxQty: number) {
+        const startedVaultIds: string[] = [];
+
+        const promises: Promise<void>[] = [];
+
+        while (true) {
+            try {
+                const currentVaults = await this.interBTC.vaults.list();
+
+                for (const vault of currentVaults) {
+                    if (vault.status != 0) continue; // Status 0 = Active, 1 = Inactive, 2 = Liquidated
+
+                    if (startedVaultIds.includes(vault.id)) continue;
+
+                    startedVaultIds.push(vault.id);
+
+                    promises.push(this.runVault(vault, maxQty));
+                }
+            } catch (error) {
+                console.error('runAllVaults failed');
+                console.error(error);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
     }
 }
