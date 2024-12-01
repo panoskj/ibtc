@@ -1,8 +1,12 @@
 import { createInterBtcService } from './service';
+import { hookConsoleLogging } from './logging';
 import * as dotenv from 'dotenv';
-dotenv.config();
 
 async function main() {
+    hookConsoleLogging();
+
+    dotenv.config();
+
     if (!process.env.MNEMONIC) throw new Error('MNEMONIC must be specified in the .env file.');
 
     const service = await createInterBtcService();
