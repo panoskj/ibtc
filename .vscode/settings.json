@@ -1,0 +1,22 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.insertSpaces": true,
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.eol": "\n",
+  "files.autoSave": "onWindowChange",
+
+  "editor.tabSize": 4, // Default for JS/TS code
+
+  // Override for JSON files and JSONC files
+  "[json]": {
+    "editor.tabSize": 2
+  },
+  // Override for other JSON files .prettierrc and other JSON with comments
+  "[jsonc]": {
+    "editor.tabSize": 2
+  },
+
+  "prettier.ignorePath": ".gitignore"
+}
