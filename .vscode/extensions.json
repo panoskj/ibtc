@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "christian-kohler.path-intellisense",
+    "christian-kohler.npm-intellisense",
+    "sburg.vscode-javascript-booster",
+    "yoavbls.pretty-ts-errors",
+    "wallabyjs.quokka-vscode",
+    "pflannery.vscode-versionlens"
+  ]
+}
