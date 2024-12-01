@@ -18,5 +18,8 @@
     "editor.tabSize": 2
   },
 
-  "prettier.ignorePath": ".gitignore"
+  "prettier.ignorePath": ".gitignore",
+
+  "eslint.lintTask.enable": true,
+  "eslint.lintTask.options": ". --cache"
 }
