@@ -34,10 +34,32 @@ export class MultipleProducersSingleConsumerChannel<T> {
         });
     }
 
+    public async consumeBatch(): Promise<T[]> {
+        if (this.isClosed && this.queue.length === 0) {
+            throw new Error('Channel is closed and no items are left.');
+        }
+
+        if (this.queue.length > 0) {
+            const queue = this.queue;
+            this.queue = [];
+            return queue;
+        }
+
+        return new Promise<T[]>(resolve => {
+            this.resolveQueue.push(item => resolve([item]));
+        });
+    }
+
     // Consume all items in the channel, calling the given function for each.
     // Terminates with an exception when `this.close()` is called.
     public async runConsumeForever(action: (item: T) => Promise<void>) {
         while (true) await action(await this.consume());
+    }
+
+    // Consume all items in the channel, calling the given function for each.
+    // Terminates with an exception when `this.close()` is called.
+    public async runConsumeBatchForever(action: (batch: T[]) => Promise<void>) {
+        while (true) await action(await this.consumeBatch());
     }
 
     // Close the channel (no more items can be produced)
