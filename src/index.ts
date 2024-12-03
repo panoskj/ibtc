@@ -13,7 +13,7 @@ async function main() {
 
     await service.login(process.env.MNEMONIC);
 
-    const tasks = [service.runRemainingQty(3000), service.runAllVaults(0.1)];
+    const tasks = [service.runRemainingQty(3000), service.runMaxTip(100), service.runAllVaults(0.1)];
 
     await Promise.all(tasks);
 

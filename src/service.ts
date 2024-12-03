@@ -25,10 +25,12 @@ export class InterBtcService {
     remainingQty?: number;
     intrPerBtc: number;
     address?: string;
+    currentMaxTip: number;
 
     constructor(interBTC: InterBtcApi) {
         this.interBTC = interBTC;
         this.intrPerBtc = 33400;
+        this.currentMaxTip = 0;
     }
 
     async login(mnemonic: string) {
@@ -122,6 +124,20 @@ export class InterBtcService {
         }
     }
 
+    async runMaxTip(frequencyMilliseconds: number) {
+        const address = this.requireAddress();
+        while (true) {
+            try {
+                this.currentMaxTip = await this.getCurrentMaxTip(address);
+            } catch (ex) {
+                this.currentMaxTip = 0;
+                console.error('runMaxTip failed');
+                console.error(ex);
+            }
+            await new Promise(resolve => setTimeout(resolve, frequencyMilliseconds));
+        }
+    }
+
     async signAndSend(tx: ExtrinsicData, tip?: number) {
         if (!this.interBTC.account) throw new Error('You must login to send transactions');
         await tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip });
@@ -143,7 +159,7 @@ export class InterBtcService {
                 const max = new BitcoinAmount(Math.min(maxQty, this.remainingQty ?? maxQty));
                 const issue = issuable.min(max);
                 const result = await this.interBTC.issue.request(issue);
-                await this.signAndSend(result, 1000000);
+                await this.signAndSend(result, this.currentMaxTip + 1000000);
                 await new Promise(resolve => setTimeout(resolve, 3000));
             } catch (ex) {
                 if (canIssue) {
