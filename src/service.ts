@@ -1,4 +1,12 @@
-import { createInterBtcApi, CurrencyExt, InterBtcApi, newAccountId, VaultExt } from '@interlay/interbtc-api';
+import {
+    createInterBtcApi,
+    CurrencyExt,
+    ExtrinsicData,
+    InterBtcApi,
+    newAccountId,
+    VaultExt,
+} from '@interlay/interbtc-api';
+
 import { BitcoinAmount } from '@interlay/monetary-js';
 import { Keyring } from '@polkadot/keyring';
 
@@ -114,6 +122,11 @@ export class InterBtcService {
         }
     }
 
+    async signAndSend(tx: ExtrinsicData, tip?: number) {
+        if (!this.interBTC.account) throw new Error('You must login to send transactions');
+        await tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip });
+    }
+
     async runVault(vault: VaultExt, maxQty: number) {
         while (true) {
             let canIssue = false;
@@ -130,7 +143,7 @@ export class InterBtcService {
                 const max = new BitcoinAmount(Math.min(maxQty, this.remainingQty ?? maxQty));
                 const issue = issuable.min(max);
                 const result = await this.interBTC.issue.request(issue);
-                await result.extrinsic.signAndSend(this.requireAddress(), { tip: 1000000 });
+                await this.signAndSend(result, 1000000);
                 await new Promise(resolve => setTimeout(resolve, 3000));
             } catch (ex) {
                 if (canIssue) {
