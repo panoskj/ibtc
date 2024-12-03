@@ -149,11 +149,9 @@ export class InterBtcService {
 
         while (true) {
             try {
-                const currentVaults = await this.interBTC.vaults.list();
+                const currentVaults = await this.getActiveVaults();
 
                 for (const vault of currentVaults) {
-                    if (vault.status != 0) continue; // Status 0 = Active, 1 = Inactive, 2 = Liquidated
-
                     if (startedVaultIds.includes(vault.id)) continue;
 
                     startedVaultIds.push(vault.id);
@@ -167,5 +165,11 @@ export class InterBtcService {
 
             await new Promise(resolve => setTimeout(resolve, 3000));
         }
+    }
+
+    async getActiveVaults() {
+        const allVaults = await this.interBTC.vaults.list();
+        // Status 0 = Active, 1 = Inactive, 2 = Liquidated
+        return allVaults.filter(vault => vault.status == 0 && Number(vault.backingCollateral.toHuman()) > 1);
     }
 }
