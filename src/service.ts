@@ -138,9 +138,26 @@ export class InterBtcService {
         }
     }
 
-    async signAndSend(tx: ExtrinsicData, tip?: number) {
+    async signAndSend(tx: ExtrinsicData, maxDelay: number, tip?: number) {
         if (!this.interBTC.account) throw new Error('You must login to send transactions');
-        await tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip });
+
+        let onTxBroadcast: () => void;
+        const broadcast = new Promise<void>(resolve => (onTxBroadcast = resolve));
+        const delay = new Promise(resolve => setTimeout(resolve, maxDelay));
+
+        await tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip }, status => {
+            if (
+                status.status.isBroadcast ||
+                status.status.isDropped ||
+                status.status.isRetracted ||
+                status.status.isInvalid ||
+                status.status.isFinalityTimeout
+            ) {
+                onTxBroadcast();
+            }
+        });
+
+        await Promise.any([broadcast, delay]);
     }
 
     async runVault(vault: VaultExt, maxQty: number) {
@@ -163,8 +180,11 @@ export class InterBtcService {
                 const max = new BitcoinAmount(Math.min(maxQty, this.remainingQty ?? maxQty));
                 const issue = issuable.min(max);
                 const result = await this.interBTC.issue.request(issue);
-                await this.signAndSend(result, myTip);
-                await new Promise(resolve => setTimeout(resolve, 100));
+
+                await Promise.all([
+                    this.signAndSend(result, 1000, myTip),
+                    new Promise<void>(resolve => setTimeout(resolve, 100)),
+                ]);
             } catch (ex) {
                 if (canIssue) {
                     console.error('runVault failed');
