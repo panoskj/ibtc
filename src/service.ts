@@ -23,12 +23,14 @@ export class InterBtcService {
     currentMaxTip: number;
     vaults: Record<string, { vault: VaultExt; currentMaxIssuable?: number }>;
     runningRequest?: { totalIssueAmount: number; tip: number };
+    fullspeedMode: boolean;
 
     constructor(interBTC: InterBtcApi) {
         this.interBTC = interBTC;
         this.intrPerBtc = 33400;
         this.currentMaxTip = 0;
         this.vaults = {};
+        this.fullspeedMode = false;
     }
 
     async login(mnemonic: string) {
@@ -132,7 +134,7 @@ export class InterBtcService {
                 console.error('runMaxTip failed');
                 console.error(ex);
             }
-            await new Promise(resolve => setTimeout(resolve, frequencyMilliseconds));
+            if (!this.fullspeedMode) await new Promise(resolve => setTimeout(resolve, frequencyMilliseconds));
         }
     }
 
@@ -228,10 +230,11 @@ export class InterBtcService {
                 canIssue = true;
                 const amount = Number(issuable.mul(10e8).toHuman()) / 10e8;
                 this.vaults[`${vault.id.accountId}`].currentMaxIssuable = amount;
+                this.fullspeedMode = Object.values(this.vaults).some(x => x.currentMaxIssuable);
                 if (amount <= 0.0005) continue;
                 await Promise.all([
                     this.executeBatchIssueRequest(maxQty),
-                    new Promise<void>(resolve => setTimeout(resolve, 100)),
+                    new Promise<void>(resolve => setTimeout(resolve, this.fullspeedMode ? 5 : 100)),
                 ]);
             } catch (ex) {
                 if (canIssue) {
