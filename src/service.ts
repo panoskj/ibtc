@@ -24,6 +24,7 @@ export class InterBtcService {
     vaults: Record<string, { vault: VaultExt; currentMaxIssuable?: number }>;
     runningRequest?: { totalIssueAmount: number; tip: number };
     fullspeedMode: boolean;
+    currentTipIncrements: number;
 
     constructor(interBTC: InterBtcApi) {
         this.interBTC = interBTC;
@@ -31,6 +32,7 @@ export class InterBtcService {
         this.currentMaxTip = 0;
         this.vaults = {};
         this.fullspeedMode = false;
+        this.currentTipIncrements = 0;
     }
 
     async login(mnemonic: string) {
@@ -127,6 +129,7 @@ export class InterBtcService {
     async runMaxTip(frequencyMilliseconds: number) {
         const address = this.requireAddress();
         while (true) {
+            const prevTip = this.currentMaxTip;
             try {
                 this.currentMaxTip = await this.getCurrentMaxTip(address);
             } catch (ex) {
@@ -134,6 +137,8 @@ export class InterBtcService {
                 console.error('runMaxTip failed');
                 console.error(ex);
             }
+            if (prevTip < this.currentMaxTip) this.currentTipIncrements += 1;
+            else if (this.currentMaxTip == 0) this.currentTipIncrements = 0;
             if (!this.fullspeedMode) await new Promise(resolve => setTimeout(resolve, frequencyMilliseconds));
         }
     }
@@ -203,7 +208,7 @@ export class InterBtcService {
         }
 
         // use `totalIssueAmount` here to prioritize larger transactions (only one tx per address can be included in a block)
-        const tip = this.currentMaxTip + Math.trunc((1 + totalIssueAmount) * 1000000);
+        const tip = this.currentMaxTip + Math.trunc((1 + totalIssueAmount + this.currentTipIncrements / 5) * 1000000);
 
         // tx must have a greater tip than the currently running tx in order to succeed
         if (tip <= (this.runningRequest?.tip ?? 0)) return;
