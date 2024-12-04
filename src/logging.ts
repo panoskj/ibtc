@@ -61,14 +61,16 @@ function getDateTime() {
 export function hookConsoleLogging() {
     // Override console.log
     console.log = (...args: unknown[]): void => {
-        originalConsoleLog(...args); // Call the original method
-        const message = [getDateTime(), '[LOG]', ...args].join(' ') + '\n';
+        const time = getDateTime();
+        originalConsoleLog(time, '[LOG]', ...args); // Call the original method
+        const message = [time, '[LOG]', ...args].join(' ') + '\n';
         logWritter.write(message);
     };
     // Override console.error
     console.error = (...args: unknown[]): void => {
-        originalConsoleError(...args); // Call the original method
-        const message = [getDateTime(), '[ERROR]', ...args].join(' ') + '\n';
+        const time = getDateTime();
+        originalConsoleError(time, '[ERROR]', ...args); // Call the original method
+        const message = [time, '[ERROR]', ...args].join(' ') + '\n';
         logWritter.write(message);
     };
 }

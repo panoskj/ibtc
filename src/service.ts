@@ -169,6 +169,7 @@ export class InterBtcService {
     }
 
     async runVault(vault: VaultExt, maxQty: number) {
+        console.log(`running vault: ${vault.id.accountId}`);
         while (true) {
             let canIssue = false;
             try {
@@ -180,9 +181,8 @@ export class InterBtcService {
                 if (amount <= 0.0005) continue;
                 const myTip = this.currentMaxTip + 1000000;
 
-                console.log(`The time is ${getDateTime()}`);
                 console.log(
-                    `[${vault.id}] IssuableQty = ${amount}    -    RemainingQty = ${this.remainingQty}     ---     TIP: ${myTip} VS ${this.currentMaxTip})`,
+                    `[${vault.id.accountId}] IssuableQty = ${amount}    -    RemainingQty = ${this.remainingQty}     ---     TIP: ${myTip} VS ${this.currentMaxTip})`,
                 );
 
                 const max = new BitcoinAmount(Math.min(maxQty, this.remainingQty ?? maxQty));
@@ -213,9 +213,9 @@ export class InterBtcService {
                 const currentVaults = await this.getActiveVaults();
 
                 for (const vault of currentVaults) {
-                    if (startedVaultIds.includes(vault.id)) continue;
+                    if (startedVaultIds.includes(`${vault.id.accountId}`)) continue;
 
-                    startedVaultIds.push(vault.id);
+                    startedVaultIds.push(`${vault.id.accountId}`);
 
                     promises.push(this.runVault(vault, maxQty));
                 }
