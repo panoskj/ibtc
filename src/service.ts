@@ -1,14 +1,9 @@
-import {
-    createInterBtcApi,
-    CurrencyExt,
-    ExtrinsicData,
-    InterBtcApi,
-    newAccountId,
-    VaultExt,
-} from '@interlay/interbtc-api';
-
+import { createInterBtcApi, CurrencyExt, InterBtcApi, newAccountId, VaultExt } from '@interlay/interbtc-api';
 import { BitcoinAmount, Interlay } from '@interlay/monetary-js';
 import { Keyring } from '@polkadot/keyring';
+import { ExtrinsicData } from '@interlay/interbtc-api';
+
+type SubmittableExtrinsic = ExtrinsicData['extrinsic'];
 
 export async function createInterBtcService() {
     // If you are using a local development environment
@@ -138,7 +133,7 @@ export class InterBtcService {
         }
     }
 
-    async signAndSend(tx: ExtrinsicData & { extrinsic: unknown }, maxDelay: number, tip?: number) {
+    async signAndSend(extrinsic: SubmittableExtrinsic, maxDelay: number, tip?: number) {
         await new Promise<void>(resolve => {
             let resolved = false;
             function resolveOnce() {
@@ -152,7 +147,7 @@ export class InterBtcService {
             const signAndSend = async () => {
                 try {
                     if (!this.interBTC.account) throw new Error('You must login to send transactions');
-                    await tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip }, status => {
+                    await extrinsic.signAndSend(this.interBTC.account, { tip: tip }, status => {
                         console.log('TX Update:');
                         console.log(JSON.stringify(status.toHuman(), null, 4));
                         if (
@@ -197,7 +192,7 @@ export class InterBtcService {
                 const result = this.interBTC.issue.buildRequestIssueExtrinsic(vault.id, issue, Interlay);
 
                 await Promise.all([
-                    this.signAndSend({ extrinsic: result }, 1000, myTip),
+                    this.signAndSend(result, 1000, myTip),
                     new Promise<void>(resolve => setTimeout(resolve, 100)),
                 ]);
             } catch (ex) {
