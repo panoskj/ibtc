@@ -144,8 +144,6 @@ export class InterBtcService {
 
     async signAndSend(tx: ExtrinsicData & { extrinsic: unknown }, maxDelay: number, tip?: number) {
         await new Promise<void>(resolve => {
-            if (!this.interBTC.account) throw new Error('You must login to send transactions');
-
             let resolved = false;
             function resolveOnce() {
                 if (resolved) return;
@@ -154,17 +152,30 @@ export class InterBtcService {
             }
 
             setTimeout(resolveOnce, maxDelay);
-            tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip }, status => {
-                if (
-                    status.status.isBroadcast ||
-                    status.status.isDropped ||
-                    status.status.isRetracted ||
-                    status.status.isInvalid ||
-                    status.status.isFinalityTimeout
-                ) {
-                    resolveOnce();
+
+            const signAndSend = async () => {
+                try {
+                    if (!this.interBTC.account) throw new Error('You must login to send transactions');
+                    tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip }, status => {
+                        console.log('TX Update:');
+                        console.log(JSON.stringify(status.toHuman(), null, 4));
+                        if (
+                            status.status.isBroadcast ||
+                            status.status.isDropped ||
+                            status.status.isRetracted ||
+                            status.status.isInvalid ||
+                            status.status.isFinalityTimeout
+                        ) {
+                            resolveOnce();
+                        }
+                    });
+                } catch (error) {
+                    console.error('signAndSend failed');
+                    console.error(error);
                 }
-            });
+            };
+
+            signAndSend();
         });
     }
 
