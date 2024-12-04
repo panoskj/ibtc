@@ -2,6 +2,11 @@ import { createInterBtcApi, CurrencyExt, InterBtcApi, newAccountId, VaultExt } f
 import { BitcoinAmount, Interlay } from '@interlay/monetary-js';
 import { Keyring } from '@polkadot/keyring';
 import { ExtrinsicData } from '@interlay/interbtc-api';
+import { MultipleProducersSingleConsumerChannel } from './channel';
+
+async function delayAsync(milliseconds: number) {
+    await new Promise(resolve => setTimeout(resolve, milliseconds));
+}
 
 type SubmittableExtrinsic = ExtrinsicData['extrinsic'];
 
@@ -123,7 +128,7 @@ export class InterBtcService {
                 console.error(error);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await delayAsync(1000);
         }
     }
 
@@ -140,7 +145,7 @@ export class InterBtcService {
                 console.error(ex);
             }
 
-            await new Promise(resolve => setTimeout(resolve, frequencyMilliseconds));
+            await delayAsync(frequencyMilliseconds);
         }
     }
 
@@ -161,7 +166,7 @@ export class InterBtcService {
             if (prevTip != this.currentMaxTip) this.maxTipChange.signal();
             if (prevTip < this.currentMaxTip) this.currentTipIncrements += 1;
             else if (this.currentMaxTip == 0) this.currentTipIncrements = 0;
-            if (!this.fullspeedMode) await new Promise(resolve => setTimeout(resolve, frequencyMilliseconds));
+            if (!this.fullspeedMode) await delayAsync(frequencyMilliseconds);
         }
     }
 
@@ -200,8 +205,32 @@ export class InterBtcService {
 
             signAndSend();
         });
-        const minDelayPromise = new Promise(resolve => setTimeout(resolve, minDelay));
+        const minDelayPromise = delayAsync(minDelay);
         await Promise.all([job, minDelayPromise]);
+    }
+
+    async optimizedSignAndSend(
+        extrinsicsChannel: MultipleProducersSingleConsumerChannel<SubmittableExtrinsic | null>,
+        baseTip?: number,
+        additionalTipPerSecond?: number,
+    ) {
+        let additionalTip = 0;
+        let extrinsicToSend: SubmittableExtrinsic | null = null;
+        while (true) {
+            const batchPromise = extrinsicsChannel.consumeBatch();
+            if (!extrinsicToSend) {
+                const batch = await batchPromise;
+                extrinsicToSend = batch[batch.length - 1];
+            } else {
+                const delayPromise = delayAsync(50);
+                const result = await Promise.any([delayPromise, batchPromise]);
+                if (result) extrinsicToSend = result[result.length - 1];
+            }
+            if (!extrinsicToSend) continue;
+            const tip = (baseTip ?? 1) + this.currentMaxTip + additionalTip;
+            await this.signAndSend(extrinsicToSend, 0, 0, tip);
+            additionalTip += Math.trunc((additionalTipPerSecond ?? 200000000) / 20);
+        }
     }
 
     async batchSignAndSend(extrinsics: SubmittableExtrinsic[], minDelay: number, maxDelay: number, tip?: number) {
@@ -271,7 +300,7 @@ export class InterBtcService {
                     console.error('runVault failed');
                     console.error(ex);
                 }
-                if (!canIssue) await new Promise(resolve => setTimeout(resolve, 30000));
+                if (!canIssue) await delayAsync(30000);
             }
         }
         delete this.vaults[`${vault.id.accountId}`];
@@ -298,7 +327,7 @@ export class InterBtcService {
                 console.error(error);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await delayAsync(3000);
         }
     }
 
