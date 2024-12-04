@@ -170,7 +170,13 @@ export class InterBtcService {
         }
     }
 
-    async signAndSend(extrinsic: SubmittableExtrinsic, minDelay: number, maxDelay: number, tip?: number) {
+    async signAndSend(
+        extrinsic: SubmittableExtrinsic,
+        minDelay: number,
+        maxDelay: number,
+        tip?: number,
+        name?: string,
+    ) {
         const job = new Promise<void>(resolve => {
             let resolved = false;
             function resolveOnce() {
@@ -185,8 +191,8 @@ export class InterBtcService {
                 try {
                     if (!this.interBTC.account) throw new Error('You must login to send transactions');
                     await extrinsic.signAndSend(this.interBTC.account, { tip: tip }, status => {
-                        console.log('TX Update:');
-                        console.log(JSON.stringify(status.toHuman(), null, 4));
+                        //console.log(`TX Update: ${name}`);
+                        //console.log(JSON.stringify(status.toHuman(), null, 4));
                         if (
                             status.status.isBroadcast ||
                             status.status.isDropped ||
@@ -203,6 +209,7 @@ export class InterBtcService {
                 }
             };
 
+            console.log(`Sign And Send ${name}`);
             signAndSend();
         });
         const minDelayPromise = delayAsync(minDelay);
@@ -221,22 +228,33 @@ export class InterBtcService {
         baseTip?: number,
         additionalTipPerSecond?: number,
         runsPerSecond?: number,
+        name?: string,
     ) {
         let additionalTip = 0;
         let extrinsicToSend: SubmittableExtrinsic | null = null;
+        let batchPromise: Promise<(SubmittableExtrinsic | null)[]> | null = null;
+        function consumeBatch() {
+            async function consumeBatchAsync() {
+                const result = await extrinsicsChannel.consumeBatch();
+                batchPromise = null;
+                return result;
+            }
+            return (batchPromise ??= consumeBatchAsync());
+        }
         while (true) {
-            const batchPromise = extrinsicsChannel.consumeBatch();
             if (!extrinsicToSend) {
-                const batch = await batchPromise;
+                const batch = await consumeBatch();
                 extrinsicToSend = batch[batch.length - 1];
             } else {
                 const delayPromise = delayAsync(Math.trunc(1000 / (runsPerSecond ?? 20)));
-                const result = await Promise.any([delayPromise, batchPromise]);
-                if (result) extrinsicToSend = result[result.length - 1];
+                const result = await Promise.any([delayPromise, consumeBatch()]);
+                if (result) {
+                    extrinsicToSend = result[result.length - 1];
+                }
             }
             if (!extrinsicToSend) return;
             const tip = (baseTip ?? 1) + this.currentMaxTip + additionalTip;
-            await this.signAndSend(extrinsicToSend, 0, 0, tip);
+            await this.signAndSend(extrinsicToSend, 0, 0, tip, `${name} - tip: ${tip} vs ${this.currentMaxTip}`);
             additionalTip += Math.trunc((additionalTipPerSecond ?? 200000000) / (runsPerSecond ?? 20));
         }
     }
