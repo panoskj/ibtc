@@ -180,7 +180,7 @@ export class InterBtcService {
         await this.signAndSend(extrinsic, maxDelay, tip);
     }
 
-    async executeBatchIssueRequest(maxQty: number) {
+    async executeBatchIssueRequest(maxQty: number, maxDelay: number) {
         const extrinsics: SubmittableExtrinsic[] = [];
         let remainingQty = this.remainingQty ?? maxQty;
         let totalIssueAmount = 0;
@@ -212,7 +212,7 @@ export class InterBtcService {
 
         try {
             this.runningRequest = { totalIssueAmount, tip };
-            await this.batchSignAndSend(extrinsics, tip);
+            await this.batchSignAndSend(extrinsics, maxDelay, tip);
         } finally {
             delete this.runningRequest;
         }
@@ -233,7 +233,7 @@ export class InterBtcService {
                 this.fullspeedMode = Object.values(this.vaults).some(x => x.currentMaxIssuable);
                 if (amount <= 0.0005) continue;
                 await Promise.all([
-                    this.executeBatchIssueRequest(maxQty),
+                    this.executeBatchIssueRequest(maxQty, 1000),
                     new Promise<void>(resolve => setTimeout(resolve, this.fullspeedMode ? 5 : 100)),
                 ]);
             } catch (ex) {
