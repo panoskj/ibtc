@@ -191,9 +191,10 @@ export class InterBtcService {
     }
 
     async executeBatchIssueRequest(maxQty: number, maxDelay: number) {
-        const extrinsics: SubmittableExtrinsic[] = [];
+        let extrinsics: SubmittableExtrinsic[] = [];
         let remainingQty = this.remainingQty ?? maxQty;
         let totalIssueAmount = 0;
+        let maxAmount = 0;
 
         console.log('Creating Batch TX');
 
@@ -207,6 +208,9 @@ export class InterBtcService {
             totalIssueAmount += issue;
             console.log(`Vault = ${vault.id.accountId} Request = ${issue}`);
 
+            if (issue < maxAmount) continue;
+            maxAmount = issue;
+            extrinsics = [];
             extrinsics.push(
                 this.interBTC.issue.buildRequestIssueExtrinsic(vault.id, new BitcoinAmount(issue), Interlay),
             );
@@ -222,7 +226,7 @@ export class InterBtcService {
 
         try {
             this.runningRequest = { totalIssueAmount, tip };
-            await this.batchSignAndSend(extrinsics, maxDelay, tip);
+            await this.signAndSend(extrinsics[0], maxDelay, tip);
         } finally {
             delete this.runningRequest;
         }
