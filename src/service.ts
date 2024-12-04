@@ -156,7 +156,7 @@ export class InterBtcService {
             const signAndSend = async () => {
                 try {
                     if (!this.interBTC.account) throw new Error('You must login to send transactions');
-                    tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip }, status => {
+                    await tx.extrinsic.signAndSend(this.interBTC.account, { tip: tip }, status => {
                         console.log('TX Update:');
                         console.log(JSON.stringify(status.toHuman(), null, 4));
                         if (

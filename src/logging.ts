@@ -45,18 +45,17 @@ class LogWriter {
         this.channel.produce(text);
     }
 }
+function getDateTime() {
+    return new Date().toISOString().replace('T', ' ').replace('Z', '');
+}
 
 const logWritter = new LogWriter();
 
-logWritter.write(`[STARTED] ${new Date()}\n`);
+logWritter.write(`[STARTED] ${getDateTime()}\n`);
 
 // Save references to the original console methods
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
-
-function getDateTime() {
-    return new Date().toISOString().replace('T', ' ').replace('Z', '');
-}
 
 export function hookConsoleLogging() {
     // Override console.log
