@@ -239,7 +239,7 @@ export class InterBtcService {
     }
 
     async executeBatchIssueRequest(maxQty: number, minDelay: number, maxDelay: number) {
-        let extrinsics: SubmittableExtrinsic[] = [];
+        let extrinsicFactory: (() => SubmittableExtrinsic) | null = null;
         let remainingQty = this.remainingQty ?? maxQty;
         let totalIssueAmount = 0;
         let maxAmount = 0;
@@ -258,23 +258,21 @@ export class InterBtcService {
 
             if (issue < maxAmount) continue;
             maxAmount = issue;
-            extrinsics = [];
-            extrinsics.push(
-                this.interBTC.issue.buildRequestIssueExtrinsic(vault.id, new BitcoinAmount(issue), Interlay),
-            );
+            extrinsicFactory = () =>
+                this.interBTC.issue.buildRequestIssueExtrinsic(vault.id, new BitcoinAmount(issue), Interlay);
         }
 
         // use `totalIssueAmount` here to prioritize larger transactions (only one tx per address can be included in a block)
         const tip = this.currentTipSum + Math.trunc((1 + totalIssueAmount + this.currentTipIncrements / 5) * 1000000);
 
         // tx must have a greater tip than the currently running tx in order to succeed
-        if (tip <= (this.runningRequest?.tip ?? 0)) return;
+        if (tip <= (this.runningRequest?.tip ?? 0) || !extrinsicFactory) return;
 
         console.log(`Running Batch TX - Tip = ${tip} Versus ${this.currentMaxTip}`);
 
         try {
             this.runningRequest = { totalIssueAmount, tip };
-            await this.signAndSend(extrinsics[0], minDelay, maxDelay, tip);
+            await this.signAndSend(extrinsicFactory(), minDelay, maxDelay, tip);
         } finally {
             delete this.runningRequest;
         }
