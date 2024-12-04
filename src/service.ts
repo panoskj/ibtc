@@ -153,14 +153,18 @@ export class InterBtcService {
                 canIssue = true;
                 const amount = Number(issuable.mul(10e8).toHuman()) / 10e8;
                 if (amount <= 0.0005) continue;
+                const myTip = this.currentMaxTip + 1000000;
+
                 console.log(`The time is ${new Date()}`);
-                console.log(`IssuableQty = ${amount}    -    RemainingQty = ${this.remainingQty})`);
+                console.log(
+                    `[${vault.id}] IssuableQty = ${amount}    -    RemainingQty = ${this.remainingQty}     ---     TIP: ${myTip} VS ${this.currentMaxTip})`,
+                );
 
                 const max = new BitcoinAmount(Math.min(maxQty, this.remainingQty ?? maxQty));
                 const issue = issuable.min(max);
                 const result = await this.interBTC.issue.request(issue);
-                await this.signAndSend(result, this.currentMaxTip + 1000000);
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await this.signAndSend(result, myTip);
+                await new Promise(resolve => setTimeout(resolve, 100));
             } catch (ex) {
                 if (canIssue) {
                     console.error('runVault failed');
