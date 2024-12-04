@@ -209,10 +209,18 @@ export class InterBtcService {
         await Promise.all([job, minDelayPromise]);
     }
 
+    /**
+     * Pass null in extrinsicsChannel to terminate
+     * @param extrinsicsChannel
+     * @param baseTip
+     * @param additionalTipPerSecond
+     * @returns
+     */
     async optimizedSignAndSend(
         extrinsicsChannel: MultipleProducersSingleConsumerChannel<SubmittableExtrinsic | null>,
         baseTip?: number,
         additionalTipPerSecond?: number,
+        runsPerSecond?: number,
     ) {
         let additionalTip = 0;
         let extrinsicToSend: SubmittableExtrinsic | null = null;
@@ -222,14 +230,14 @@ export class InterBtcService {
                 const batch = await batchPromise;
                 extrinsicToSend = batch[batch.length - 1];
             } else {
-                const delayPromise = delayAsync(50);
+                const delayPromise = delayAsync(Math.trunc(1000 / (runsPerSecond ?? 20)));
                 const result = await Promise.any([delayPromise, batchPromise]);
                 if (result) extrinsicToSend = result[result.length - 1];
             }
-            if (!extrinsicToSend) continue;
+            if (!extrinsicToSend) return;
             const tip = (baseTip ?? 1) + this.currentMaxTip + additionalTip;
             await this.signAndSend(extrinsicToSend, 0, 0, tip);
-            additionalTip += Math.trunc((additionalTipPerSecond ?? 200000000) / 20);
+            additionalTip += Math.trunc((additionalTipPerSecond ?? 200000000) / (runsPerSecond ?? 20));
         }
     }
 
