@@ -21,6 +21,7 @@ export class InterBtcService {
     intrPerBtc: number;
     address?: string;
     currentMaxTip: number;
+    currentTipSum: number;
     vaults: Record<string, { vault: VaultExt; currentMaxIssuable?: number }>;
     runningRequest?: { totalIssueAmount: number; tip: number };
     fullspeedMode: boolean;
@@ -30,6 +31,7 @@ export class InterBtcService {
         this.interBTC = interBTC;
         this.intrPerBtc = 33400;
         this.currentMaxTip = 0;
+        this.currentTipSum = 0;
         this.vaults = {};
         this.fullspeedMode = false;
         this.currentTipIncrements = 0;
@@ -59,7 +61,7 @@ export class InterBtcService {
             .filter(extrinsic => extrinsic.signer.toString() != excludingAddress)
             .map(extrinsic => Number(extrinsic.tip));
 
-        return Math.max(0, ...tips);
+        return { maxTip: Math.max(0, ...tips), sumTip: tips.reduce((a, b) => a + b) };
     }
 
     requireAddress() {
@@ -131,9 +133,12 @@ export class InterBtcService {
         while (true) {
             const prevTip = this.currentMaxTip;
             try {
-                this.currentMaxTip = await this.getCurrentMaxTip(address);
+                const { maxTip, sumTip } = await this.getCurrentMaxTip(address);
+                this.currentMaxTip = maxTip;
+                this.currentTipSum = sumTip;
             } catch (ex) {
                 this.currentMaxTip = 0;
+                this.currentTipSum = 0;
                 console.error('runMaxTip failed');
                 console.error(ex);
             }
@@ -208,9 +213,7 @@ export class InterBtcService {
         }
 
         // use `totalIssueAmount` here to prioritize larger transactions (only one tx per address can be included in a block)
-        const tip =
-            extrinsics.length *
-            (this.currentMaxTip + Math.trunc((1 + totalIssueAmount + this.currentTipIncrements / 5) * 1000000));
+        const tip = this.currentTipSum + Math.trunc((1 + totalIssueAmount + this.currentTipIncrements / 5) * 1000000);
 
         // tx must have a greater tip than the currently running tx in order to succeed
         if (tip <= (this.runningRequest?.tip ?? 0)) return;
