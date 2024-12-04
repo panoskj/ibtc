@@ -54,18 +54,22 @@ logWritter.write(`[STARTED] ${new Date()}\n`);
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 
+function getDateTime() {
+    return new Date().toISOString().replace('T', ' ').replace('Z', '');
+}
+
 export function hookConsoleLogging() {
     // Override console.log
     console.log = (...args: unknown[]): void => {
         originalConsoleLog(...args); // Call the original method
-        const message = ['[LOG]', ...args].join(' ') + '\n';
+        const message = [getDateTime(), '[LOG]', ...args].join(' ') + '\n';
         logWritter.write(message);
     };
     // Override console.error
     console.error = (...args: unknown[]): void => {
         originalConsoleError(...args); // Call the original method
-        const message = args.join(' ') + '\n';
-        logWritter.write(`[ERROR] ${message}`);
+        const message = [getDateTime(), '[ERROR]', ...args].join(' ') + '\n';
+        logWritter.write(message);
     };
 }
 

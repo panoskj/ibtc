@@ -20,6 +20,10 @@ export async function createInterBtcService() {
     return new InterBtcService(interBTC);
 }
 
+function getDateTime() {
+    return new Date().toISOString().replace('T', ' ').replace('Z', '');
+}
+
 export class InterBtcService {
     interBTC: InterBtcApi;
     remainingQty?: number;
@@ -176,7 +180,7 @@ export class InterBtcService {
                 if (amount <= 0.0005) continue;
                 const myTip = this.currentMaxTip + 1000000;
 
-                console.log(`The time is ${new Date()}`);
+                console.log(`The time is ${getDateTime()}`);
                 console.log(
                     `[${vault.id}] IssuableQty = ${amount}    -    RemainingQty = ${this.remainingQty}     ---     TIP: ${myTip} VS ${this.currentMaxTip})`,
                 );
