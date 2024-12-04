@@ -148,8 +148,8 @@ export class InterBtcService {
         }
     }
 
-    async signAndSend(extrinsic: SubmittableExtrinsic, maxDelay: number, tip?: number) {
-        await new Promise<void>(resolve => {
+    async signAndSend(extrinsic: SubmittableExtrinsic, minDelay: number, maxDelay: number, tip?: number) {
+        const job = new Promise<void>(resolve => {
             let resolved = false;
             function resolveOnce() {
                 if (resolved) return;
@@ -183,14 +183,16 @@ export class InterBtcService {
 
             signAndSend();
         });
+        const minDelayPromise = new Promise(resolve => setTimeout(resolve, minDelay));
+        await Promise.all([job, minDelayPromise]);
     }
 
-    async batchSignAndSend(extrinsics: SubmittableExtrinsic[], maxDelay: number, tip?: number) {
+    async batchSignAndSend(extrinsics: SubmittableExtrinsic[], minDelay: number, maxDelay: number, tip?: number) {
         const extrinsic = this.interBTC.transaction.buildBatchExtrinsic(extrinsics, false);
-        await this.signAndSend(extrinsic, maxDelay, tip);
+        await this.signAndSend(extrinsic, minDelay, maxDelay, tip);
     }
 
-    async executeBatchIssueRequest(maxQty: number, maxDelay: number) {
+    async executeBatchIssueRequest(maxQty: number, minDelay: number, maxDelay: number) {
         let extrinsics: SubmittableExtrinsic[] = [];
         let remainingQty = this.remainingQty ?? maxQty;
         let totalIssueAmount = 0;
@@ -226,7 +228,7 @@ export class InterBtcService {
 
         try {
             this.runningRequest = { totalIssueAmount, tip };
-            await this.signAndSend(extrinsics[0], maxDelay, tip);
+            await this.signAndSend(extrinsics[0], minDelay, maxDelay, tip);
         } finally {
             delete this.runningRequest;
         }
@@ -246,10 +248,7 @@ export class InterBtcService {
                 this.vaults[`${vault.id.accountId}`].currentMaxIssuable = amount;
                 this.fullspeedMode = Object.values(this.vaults).some(x => x.currentMaxIssuable);
                 if (amount <= 0.0005) continue;
-                await Promise.all([
-                    this.executeBatchIssueRequest(maxQty, 1000),
-                    new Promise<void>(resolve => setTimeout(resolve, this.fullspeedMode ? 5 : 100)),
-                ]);
+                await this.executeBatchIssueRequest(maxQty, this.fullspeedMode ? 5 : 100, 1000);
             } catch (ex) {
                 if (canIssue) {
                     console.error('runVault failed');
