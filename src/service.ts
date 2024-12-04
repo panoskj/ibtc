@@ -21,11 +21,14 @@ export class InterBtcService {
     intrPerBtc: number;
     address?: string;
     currentMaxTip: number;
+    vaults: Record<string, { vault: VaultExt; currentMaxIssuable?: number }>;
+    runningRequest?: { totalIssueAmount: number; tip: number };
 
     constructor(interBTC: InterBtcApi) {
         this.interBTC = interBTC;
         this.intrPerBtc = 33400;
         this.currentMaxTip = 0;
+        this.vaults = {};
     }
 
     async login(mnemonic: string) {
@@ -170,29 +173,64 @@ export class InterBtcService {
         });
     }
 
+    async batchSignAndSend(extrinsics: SubmittableExtrinsic[], maxDelay: number, tip?: number) {
+        const extrinsic = this.interBTC.transaction.buildBatchExtrinsic(extrinsics, false);
+        await this.signAndSend(extrinsic, maxDelay, tip);
+    }
+
+    async executeBatchIssueRequest(maxQty: number) {
+        const extrinsics: SubmittableExtrinsic[] = [];
+        let remainingQty = this.remainingQty ?? maxQty;
+        let totalIssueAmount = 0;
+
+        console.log('Creating Batch TX');
+
+        for (const vaultId in this.vaults) {
+            const { vault, currentMaxIssuable } = this.vaults[vaultId];
+            if ((currentMaxIssuable ?? 0) <= 0.0005) continue;
+
+            const issue = Math.min(maxQty, remainingQty, currentMaxIssuable!);
+            remainingQty -= issue;
+
+            totalIssueAmount += issue;
+            console.log(`Vault = ${vault.id.accountId} Request = ${issue}`);
+
+            extrinsics.push(
+                this.interBTC.issue.buildRequestIssueExtrinsic(vault.id, new BitcoinAmount(issue), Interlay),
+            );
+        }
+
+        // use `totalIssueAmount` here to prioritize larger transactions (only one tx per address can be included in a block)
+        const tip = this.currentMaxTip + Math.trunc((1 + totalIssueAmount) * 1000000);
+
+        // tx must have a greater tip than the currently running tx in order to succeed
+        if (tip <= (this.runningRequest?.tip ?? 0)) return;
+
+        console.log(`Running Batch TX - Tip = ${tip} Versus ${this.currentMaxTip}`);
+
+        try {
+            this.runningRequest = { totalIssueAmount, tip };
+            await this.batchSignAndSend(extrinsics, tip);
+        } finally {
+            delete this.runningRequest;
+        }
+    }
+
     async runVault(vault: VaultExt, maxQty: number) {
         console.log(`running vault: ${vault.id.accountId}`);
+        this.vaults[`${vault.id.accountId}`] = { vault };
         while (true) {
             let canIssue = false;
             try {
-                if (!this.interBTC.account) return;
-                if (vault.backingCollateral.isZero()) return;
+                if (!this.interBTC.account) break;
+                if (vault.backingCollateral.isZero()) break;
                 const issuable = await vault.getIssuableTokens();
                 canIssue = true;
                 const amount = Number(issuable.mul(10e8).toHuman()) / 10e8;
+                this.vaults[`${vault.id.accountId}`].currentMaxIssuable = amount;
                 if (amount <= 0.0005) continue;
-                const myTip = this.currentMaxTip + Math.trunc((1 + amount) * 1000000);
-
-                console.log(
-                    `[${vault.id.accountId}] IssuableQty = ${amount}    -    RemainingQty = ${this.remainingQty}     ---     TIP: ${myTip} VS ${this.currentMaxTip})`,
-                );
-
-                const max = new BitcoinAmount(Math.min(maxQty, this.remainingQty ?? maxQty));
-                const issue = issuable.min(max);
-                const result = this.interBTC.issue.buildRequestIssueExtrinsic(vault.id, issue, Interlay);
-
                 await Promise.all([
-                    this.signAndSend(result, 1000, myTip),
+                    this.executeBatchIssueRequest(maxQty),
                     new Promise<void>(resolve => setTimeout(resolve, 100)),
                 ]);
             } catch (ex) {
@@ -203,6 +241,7 @@ export class InterBtcService {
                 if (!canIssue) await new Promise(resolve => setTimeout(resolve, 30000));
             }
         }
+        delete this.vaults[`${vault.id.accountId}`];
     }
 
     async runAllVaults(maxQty: number) {
