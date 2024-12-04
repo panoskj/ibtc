@@ -10,20 +10,6 @@ async function delayAsync(milliseconds: number) {
 
 type SubmittableExtrinsic = ExtrinsicData['extrinsic'];
 
-class Signal {
-    private promise?: Promise<void>;
-    private resolve?: () => void;
-    signal() {
-        this.resolve?.();
-        delete this.resolve;
-    }
-    async waitNextSignal() {
-        if (!this.promise) this.promise = new Promise<void>(resolve => (this.resolve = resolve));
-
-        await this.promise;
-    }
-}
-
 export async function createInterBtcService() {
     // If you are using a local development environment
     // const PARACHAIN_ENDPOINT = "ws://127.0.0.1:9944";
@@ -45,7 +31,6 @@ export class InterBtcService {
     runningRequest?: { totalIssueAmount: number; tip: number };
     fullspeedMode: boolean;
     currentTipIncrements: number;
-    maxTipChange: Signal;
 
     constructor(interBTC: InterBtcApi) {
         this.interBTC = interBTC;
@@ -55,7 +40,6 @@ export class InterBtcService {
         this.vaults = {};
         this.fullspeedMode = false;
         this.currentTipIncrements = 0;
-        this.maxTipChange = new Signal();
     }
 
     async login(mnemonic: string) {
@@ -163,7 +147,6 @@ export class InterBtcService {
                 console.error('runMaxTip failed');
                 console.error(ex);
             }
-            if (prevTip != this.currentMaxTip) this.maxTipChange.signal();
             if (prevTip < this.currentMaxTip) this.currentTipIncrements += 1;
             else if (this.currentMaxTip == 0) this.currentTipIncrements = 0;
             if (!this.fullspeedMode) await delayAsync(frequencyMilliseconds);
