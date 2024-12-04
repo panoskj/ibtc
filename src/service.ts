@@ -20,10 +20,6 @@ export async function createInterBtcService() {
     return new InterBtcService(interBTC);
 }
 
-function getDateTime() {
-    return new Date().toISOString().replace('T', ' ').replace('Z', '');
-}
-
 export class InterBtcService {
     interBTC: InterBtcApi;
     remainingQty?: number;
