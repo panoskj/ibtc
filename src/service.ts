@@ -208,7 +208,9 @@ export class InterBtcService {
         }
 
         // use `totalIssueAmount` here to prioritize larger transactions (only one tx per address can be included in a block)
-        const tip = this.currentMaxTip + Math.trunc((1 + totalIssueAmount + this.currentTipIncrements / 5) * 1000000);
+        const tip =
+            extrinsics.length *
+            (this.currentMaxTip + Math.trunc((1 + totalIssueAmount + this.currentTipIncrements / 5) * 1000000));
 
         // tx must have a greater tip than the currently running tx in order to succeed
         if (tip <= (this.runningRequest?.tip ?? 0)) return;
