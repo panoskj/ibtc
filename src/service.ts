@@ -298,7 +298,7 @@ export class InterBtcService {
                 canIssue = true;
                 const amount = Number(issuable.mul(10e8).toHuman()) / 10e8;
                 this.vaults[`${vault.id.accountId}`].currentMaxIssuable = amount;
-                this.fullspeedMode = Object.values(this.vaults).some(x => x.currentMaxIssuable);
+                this.fullspeedMode = Object.values(this.vaults).some(x => (x.currentMaxIssuable ?? 0) > 0.0005);
                 if (amount <= 0.0005) continue;
                 await this.executeBatchIssueRequest(maxQty, this.fullspeedMode ? 5 : 100, 1000);
             } catch (ex) {
