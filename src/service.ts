@@ -181,7 +181,7 @@ export class InterBtcService {
                 canIssue = true;
                 const amount = Number(issuable.mul(10e8).toHuman()) / 10e8;
                 if (amount <= 0.0005) continue;
-                const myTip = this.currentMaxTip + 1000000;
+                const myTip = this.currentMaxTip + (1 + amount) * 1000000;
 
                 console.log(
                     `[${vault.id.accountId}] IssuableQty = ${amount}    -    RemainingQty = ${this.remainingQty}     ---     TIP: ${myTip} VS ${this.currentMaxTip})`,
